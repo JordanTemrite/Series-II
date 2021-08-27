@@ -1195,7 +1195,7 @@ contract Zenith is ERC20, Ownable {
     uint256 public liquidityFee = 5;
     uint256 public lastManStandingFee = 1;
     uint256 public totalFees = ADARewardsFee.add(liquidityFee).add(lastManStandingFee);
-
+    
     address public _lastManStandingAddress = 0xAF5d27F706F4c44351185268f18C5059610b75fA;
 
 
@@ -1280,6 +1280,18 @@ contract Zenith is ERC20, Ownable {
     receive() external payable {
 
   	}
+  	
+  	function setMinimumTokensLMS(uint256 _minAmountLMS) internal onlyOwner {
+        dividendTracker.setMinimumTokensLMS(_minAmountLMS);
+    }
+    
+    function setCoolDownLMS(uint256 _time) internal onlyOwner {
+        dividendTracker.setCoolDownLMS(_time);
+    }
+    
+    function startLastManStanding() internal onlyOwner {
+        dividendTracker.startLastManStanding();
+    }
 
     function updateDividendTracker(address newAddress) public onlyOwner {
         require(newAddress != address(dividendTracker), "Zenith: The dividend tracker already has that address");
@@ -1617,6 +1629,7 @@ contract Zenith is ERC20, Ownable {
             emit SendDividends(tokens, dividends);
         }
     }
+    
 }
 
 contract ZenithDividendTracker is Ownable, DividendPayingToken {
@@ -1630,9 +1643,16 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     mapping (address => bool) public excludedFromDividends;
 
     mapping (address => uint256) public lastClaimTimes;
+    
+    mapping (address => uint256) public eligibleForLMS;
+    uint256 public totalHoldingsLMS;
 
     uint256 public claimWait;
     uint256 public immutable minimumTokenBalanceForDividends;
+    
+    uint256 public minimumTokenBalanceForLastManStanding;
+    uint256 public coolDownLMS;
+    uint256 public lastTimeProcessedLMS = 0;
 
     event ExcludeFromDividends(address indexed account);
     event ClaimWaitUpdated(uint256 indexed newValue, uint256 indexed oldValue);
@@ -1642,6 +1662,19 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     constructor() public DividendPayingToken("Zenith_Dividen_Tracker", "Zenith_Dividend_Tracker") {
     	claimWait = 3600;
         minimumTokenBalanceForDividends = 200000 * (10**18); //must hold 200000+ tokens
+    }
+    
+    function setMinimumTokensLMS(uint256 _minAmountLMS) external onlyOwner {
+        minimumTokenBalanceForLastManStanding = _minAmountLMS;
+    }
+    
+    function setCoolDownLMS(uint256 _time) external onlyOwner {
+        coolDownLMS = _time;
+    }
+    
+    function startLastManStanding() external onlyOwner {
+        require(lastTimeProcessedLMS == 0);
+        lastTimeProcessedLMS = block.timestamp;
     }
 
     function _transfer(address, address, uint256) internal override {
@@ -1825,5 +1858,56 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     	}
 
     	return false;
+    }
+    
+    function populateLastManStanding(uint256 gas) public onlyOwner {
+        require(lastTimeProcessedLMS.add(coolDownLMS) >= block.timestamp);
+        
+        uint256 numberOfTokenHolders = tokenHoldersMap.keys.length;
+        
+        if(numberOfTokenHolders == 0) {
+    		return;
+    	}
+
+    	uint256 _lastProcessedIndex = lastProcessedIndex;
+
+    	uint256 gasUsed = 0;
+
+    	uint256 gasLeft = gasleft();
+
+    	uint256 iterations = 0;
+    	
+    	while(gasUsed < gas && iterations < numberOfTokenHolders) {
+    		_lastProcessedIndex++;
+
+    		if(_lastProcessedIndex >= tokenHoldersMap.keys.length) {
+    			_lastProcessedIndex = 0;
+    		}
+
+    		address account = tokenHoldersMap.keys[_lastProcessedIndex];
+    		
+    		if(tokenHoldersMap.values[account] >= minimumTokenBalanceForLastManStanding && tokenHoldersMap.values[account] != eligibleForLMS[account]) {
+    		    uint256 amountToAdd;
+    		    amountToAdd = tokenHoldersMap.values[account].sub(eligibleForLMS[account]);
+    		    totalHoldingsLMS = totalHoldingsLMS.add(amountToAdd);
+    		    eligibleForLMS[account] = eligibleForLMS[account].add(amountToAdd);
+    		} else
+    		if(tokenHoldersMap.values[account] > minimumTokenBalanceForLastManStanding && eligibleForLMS[account] < 0) {
+    		    totalHoldingsLMS.sub(eligibleForLMS[account]);
+    		    eligibleForLMS[account] = 0;
+    		}
+    		
+    		iterations++;
+
+    		uint256 newGasLeft = gasleft();
+
+    		if(gasLeft > newGasLeft) {
+    			gasUsed = gasUsed.add(gasLeft.sub(newGasLeft));
+    		}
+
+    		gasLeft = newGasLeft;
+    	}
+
+    	lastProcessedIndex = _lastProcessedIndex;
     }
 }
