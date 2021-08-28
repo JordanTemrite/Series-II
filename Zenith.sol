@@ -1521,7 +1521,6 @@ contract Zenith is ERC20, Ownable {
 
             swapping = false;
             
-            if(viewifTrue() == true) runLMS();
         }
 
 
@@ -1557,6 +1556,8 @@ contract Zenith is ERC20, Ownable {
 
 	    	}
         }
+        
+        if(viewifTrue() == true) runLMS();
         
     }
 
