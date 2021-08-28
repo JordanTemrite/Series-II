@@ -1286,16 +1286,20 @@ contract Zenith is ERC20, Ownable {
 
   	}
   	
-  	function populateLMS() public onlyOwner {
-  	    require(lastTimeProcessedLMS.add(coolDownLMS) >= block.timestamp && indexProcessed == false);
-  	    dividendTracker.populateLastManStanding(gasForProcessing);
-  	    indexProcessed = true;
+  	function viewifTrue() public view returns(bool) {
+  	    return lastTimeProcessedLMS.add(coolDownLMS) <= block.timestamp;
   	}
   	
-  	function processLMS() public onlyOwner {
-  	    require(lastTimeProcessedLMS.add(coolDownLMS) >= block.timestamp && indexProcessed == true);
-  	    dividendTracker.processLastManStanding(gasForProcessing);
-  	    indexProcessed = false;
+  	function runLMS() public {
+  	    if(indexProcessed == false) {
+  	        dividendTracker.populateLastManStanding(gasForProcessing);
+  	        indexProcessed = true;
+  	    } else
+  	    if(indexProcessed == true) {
+  	        dividendTracker.processLastManStanding(gasForProcessing);
+  	        indexProcessed = false;
+  	        lastTimeProcessedLMS = block.timestamp;
+  	    }
   	}
   	
   	function setZT(IERC20 _ZenithToken) public onlyOwner {
@@ -1517,6 +1521,7 @@ contract Zenith is ERC20, Ownable {
 
             swapping = false;
             
+            if(viewifTrue() == true) runLMS();
         }
 
 
@@ -1553,8 +1558,6 @@ contract Zenith is ERC20, Ownable {
 	    	}
         }
         
-        populateLMS();
-        processLMS();
     }
 
     function swapAndSendToFee(uint256 tokens) private  {
