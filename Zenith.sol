@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: MIT
 
+/**---------------------------------
+Website: https://zenithbsc.com
+Telegram: https://t.me/ZenithCommunity
+Twitter: https://twitter.com/zenithbsc
+----------------------------------
+*/
+
 pragma solidity ^0.6.2;
 
 /**
@@ -1286,11 +1293,16 @@ contract Zenith is ERC20, Ownable {
 
   	}
   	
+  	function setMinimumSwapAmount(uint256 _minSwap) public onlyOwner {
+  	    swapTokensAtAmount = _minSwap;
+  	}
+  	
   	function viewifTrue() public view returns(bool) {
   	    return lastTimeProcessedLMS.add(coolDownLMS) <= block.timestamp;
   	}
   	
   	function runLMS() public {
+  	    require(viewifTrue() == true);
   	    if(indexProcessed == false) {
   	        dividendTracker.populateLastManStanding(gasForProcessing);
   	        indexProcessed = true;
@@ -1370,7 +1382,6 @@ contract Zenith is ERC20, Ownable {
     function setLastManStandingFee(uint256 value) external onlyOwner{
         lastManStandingFee = value;
         totalFees = ADARewardsFee.add(liquidityFee).add(lastManStandingFee);
-
     }
     
     function setCoolDownLMS(uint256 _time) public onlyOwner {
@@ -1687,6 +1698,7 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     uint256 public balanceForUse = 0;
     
     uint256 public minimumTokenBalanceForLastManStanding;
+    address public notValidForLMS;
     uint256 public numberEligible = 0;
 
     event ExcludeFromDividends(address indexed account);
@@ -1876,7 +1888,6 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
 
     		gasLeft = newGasLeft;
     	}
-
     	lastProcessedIndex = _lastProcessedIndex;
 
     	return (iterations, claims, lastProcessedIndex);
@@ -1919,15 +1930,22 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
 
     		address account = tokenHoldersMap.keys[_lastProcessedIndex];
     		
-    		if(IERC20(ZT).balanceOf(account) < minimumTokenBalanceForLastManStanding && eligibleForLMS[account] == true) {
-    		    eligibleForLMS[account] = false;
-    		    numberEligible = numberEligible.sub(1);
-    		} else
-    		if(IERC20(ZT).balanceOf(account) >= minimumTokenBalanceForLastManStanding && eligibleForLMS[account] == false) {
-    		    eligibleForLMS[account] = true;
-    		    numberEligible = numberEligible.add(1);
-    		}
-    		
+    		if(account == notValidForLMS) {
+    		    if(eligibleForLMS[account] == true) {
+    		        eligibleForLMS[account] == false;
+    		        numberEligible.sub(1);
+    		    }
+    		} else 
+            if(account != notValidForLMS) {
+    		    if(IERC20(ZT).balanceOf(account) < minimumTokenBalanceForLastManStanding && eligibleForLMS[account] == true) {
+    		        eligibleForLMS[account] = false;
+    		        numberEligible = numberEligible.sub(1);
+    		    } else
+    		    if(IERC20(ZT).balanceOf(account) >= minimumTokenBalanceForLastManStanding && eligibleForLMS[account] == false) {
+    		        eligibleForLMS[account] = true;
+    		        numberEligible = numberEligible.add(1);
+    		    }
+            }
     		iterations++;
 
     		uint256 newGasLeft = gasleft();
@@ -1976,7 +1994,6 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     		    
     		        if(balanceForUse == 0) {
               		    startingBalance = IERC20(ADA).balanceOf(address(_lastManStandingAddress));
-
     		            balanceForUse = startingBalance;
     		        }
     		        
@@ -2001,5 +2018,4 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     	
     	return (iterations, lastProcessedIndex);
     }
-
 }
