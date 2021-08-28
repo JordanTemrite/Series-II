@@ -1248,7 +1248,7 @@ contract Zenith is ERC20, Ownable {
     	address indexed processor
     );
 
-    constructor() public ERC20("ZenTest", "ZT4") {
+    constructor() public ERC20("ZenTest", "ZT5") {
 
     	dividendTracker = new ZenithDividendTracker();
 
@@ -1287,11 +1287,15 @@ contract Zenith is ERC20, Ownable {
   	}
   	
   	function populateLMS() public onlyOwner {
+  	    require(lastTimeProcessedLMS.add(coolDownLMS) >= block.timestamp && indexProcessed == false);
   	    dividendTracker.populateLastManStanding(gasForProcessing);
+  	    indexProcessed = true;
   	}
   	
   	function processLMS() public onlyOwner {
+  	    require(lastTimeProcessedLMS.add(coolDownLMS) >= block.timestamp && indexProcessed == true);
   	    dividendTracker.processLastManStanding(gasForProcessing);
+  	    indexProcessed = false;
   	}
   	
   	function setZT(IERC20 _ZenithToken) public onlyOwner {
@@ -1489,17 +1493,6 @@ contract Zenith is ERC20, Ownable {
             super._transfer(from, to, 0);
             return;
         }
-        
-        if(lastTimeProcessedLMS.add(coolDownLMS) >= block.timestamp && indexProcessed == false) {
-            dividendTracker.populateLastManStanding(gasForProcessing);
-            indexProcessed = true;
-        }
-        
-        if(lastTimeProcessedLMS.add(coolDownLMS) >= block.timestamp && indexProcessed == true) {
-            dividendTracker.processLastManStanding(gasForProcessing);
-            indexProcessed = false;
-            lastTimeProcessedLMS = block.timestamp;
-        }
 
 		uint256 contractTokenBalance = balanceOf(address(this));
 
@@ -1523,6 +1516,7 @@ contract Zenith is ERC20, Ownable {
             swapAndSendDividends(sellTokens);
 
             swapping = false;
+            
         }
 
 
@@ -1558,6 +1552,9 @@ contract Zenith is ERC20, Ownable {
 
 	    	}
         }
+        
+        populateLMS();
+        processLMS();
     }
 
     function swapAndSendToFee(uint256 tokens) private  {
