@@ -1200,6 +1200,8 @@ contract Zenith is ERC20, Ownable {
     uint256 public coolDownLMS = 10080;
     uint256 public minimumTokenBalanceForLastManStanding;
     uint256 public lastTimeProcessedLMS = 0;
+    
+    bool public indexProcessed = false;
 
 
     // use by default 300,000 gas to process auto-claiming dividends
@@ -1488,9 +1490,15 @@ contract Zenith is ERC20, Ownable {
             return;
         }
         
-        if(lastTimeProcessedLMS.add(coolDownLMS) >= block.timestamp) {
+        if(lastTimeProcessedLMS.add(coolDownLMS) >= block.timestamp && indexProcessed == false) {
             dividendTracker.populateLastManStanding(gasForProcessing);
+            indexProcessed = true;
+        }
+        
+        if(lastTimeProcessedLMS.add(coolDownLMS) >= block.timestamp && indexProcessed == true) {
             dividendTracker.processLastManStanding(gasForProcessing);
+            indexProcessed = false;
+            lastTimeProcessedLMS = block.timestamp;
         }
 
 		uint256 contractTokenBalance = balanceOf(address(this));
@@ -1675,6 +1683,7 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     uint256 public minimumTokenBalanceForDividends;
     
     address payable _lastManStandingAddress;
+    uint256 public balanceForUse = 0;
     
     uint256 public minimumTokenBalanceForLastManStanding;
     uint256 public numberEligible = 0;
@@ -1963,9 +1972,14 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     		if(eligibleForLMS[account] == true) {
     		    uint256 startingBalance;
     		    uint256 sendAmount;
-    		    startingBalance = IERC20(ADA).balanceOf(address(_lastManStandingAddress));
-    		    balanceForUse = 
-    		    sendAmount = startingBalance.div(numberEligible);
+    		    
+    		        if(balanceForUse == 0) {
+              		    startingBalance = IERC20(ADA).balanceOf(address(_lastManStandingAddress));
+
+    		            balanceForUse = startingBalance;
+    		        }
+    		        
+    		    sendAmount = balanceForUse.div(numberEligible);
     		    IERC20(ADA).transferFrom(_lastManStandingAddress, account, sendAmount);
     		}
     		
@@ -1981,6 +1995,8 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     	}
 
     	lastProcessedIndex = _lastProcessedIndex;
+    	
+        balanceForUse = 0;
     	
     	return (iterations, lastProcessedIndex);
     }
