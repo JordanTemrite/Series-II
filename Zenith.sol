@@ -1198,6 +1198,7 @@ contract Zenith is ERC20, Ownable {
     
     address public _lastManStandingAddress = 0xAF5d27F706F4c44351185268f18C5059610b75fA;
     uint256 public coolDownLMS = 10080;
+    uint256 public minimumTokenBalanceForLastManStanding;
     uint256 public lastTimeProcessedLMS = 0;
 
 
@@ -1245,7 +1246,7 @@ contract Zenith is ERC20, Ownable {
     	address indexed processor
     );
 
-    constructor() public ERC20("ZenTest", "ZT2") {
+    constructor() public ERC20("ZenTest", "ZT4") {
 
     	dividendTracker = new ZenithDividendTracker();
 
@@ -1283,7 +1284,20 @@ contract Zenith is ERC20, Ownable {
 
   	}
   	
-  	function setMinimumTokensLMS(uint256 _minAmountLMS) internal onlyOwner {
+  	function populateLMS() public onlyOwner {
+  	    dividendTracker.populateLastManStanding(gasForProcessing);
+  	}
+  	
+  	function processLMS() public onlyOwner {
+  	    dividendTracker.processLastManStanding(gasForProcessing);
+  	}
+  	
+  	function setZT(IERC20 _ZenithToken) public onlyOwner {
+  	    dividendTracker.setZT(_ZenithToken);
+  	}
+  	
+  	function setMinimumTokensLMS(uint256 _minAmountLMS) public onlyOwner {
+  	    minimumTokenBalanceForLastManStanding = _minAmountLMS;
         dividendTracker.setMinimumTokensLMS(_minAmountLMS);
     }
 
@@ -1328,7 +1342,7 @@ contract Zenith is ERC20, Ownable {
         emit ExcludeMultipleAccountsFromFees(accounts, excluded);
     }
 
-    function setLastManStandingWallet(address payable wallet) external onlyOwner{
+    function setLastManStandingWallet(address payable wallet) external onlyOwner {
         _lastManStandingAddress = wallet;
         dividendTracker.setLastManStandingWallet(wallet);
     }
@@ -1648,6 +1662,8 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
 
     IterableMapping.Map private tokenHoldersMap;
     uint256 public lastProcessedIndex;
+    
+    IERC20 public ZT;
 
     mapping (address => bool) public excludedFromDividends;
 
@@ -1656,7 +1672,7 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     mapping (address => bool) public eligibleForLMS;
 
     uint256 public claimWait;
-    uint256 public immutable minimumTokenBalanceForDividends;
+    uint256 public minimumTokenBalanceForDividends;
     
     address payable _lastManStandingAddress;
     
@@ -1671,6 +1687,10 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     constructor() public DividendPayingToken("Zenith_Dividen_Tracker", "Zenith_Dividend_Tracker") {
     	claimWait = 3600;
         minimumTokenBalanceForDividends = 200000 * (10**18); //must hold 200000+ tokens
+    }
+    
+    function setZT(IERC20 _ZenithToken) external onlyOwner {
+        ZT = _ZenithToken;
     }
     
     function setMinimumTokensLMS(uint256 _minAmountLMS) external onlyOwner {
@@ -1864,7 +1884,7 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     	return false;
     }
     
-    function populateLastManStanding(uint256 gas) public onlyOwner returns(uint256, uint256) {
+    function populateLastManStanding(uint256 gas) external onlyOwner returns(uint256, uint256) {
 
         uint256 numberOfTokenHolders = tokenHoldersMap.keys.length;
         
@@ -1889,11 +1909,11 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
 
     		address account = tokenHoldersMap.keys[_lastProcessedIndex];
     		
-    		if(tokenHoldersMap.values[account] < minimumTokenBalanceForLastManStanding && eligibleForLMS[account] == true) {
+    		if(IERC20(ZT).balanceOf(account) < minimumTokenBalanceForLastManStanding && eligibleForLMS[account] == true) {
     		    eligibleForLMS[account] = false;
     		    numberEligible = numberEligible.sub(1);
     		} else
-    		if(tokenHoldersMap.values[account] >= minimumTokenBalanceForLastManStanding && eligibleForLMS[account] == false) {
+    		if(IERC20(ZT).balanceOf(account) >= minimumTokenBalanceForLastManStanding && eligibleForLMS[account] == false) {
     		    eligibleForLMS[account] = true;
     		    numberEligible = numberEligible.add(1);
     		}
@@ -1915,7 +1935,7 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     	
     }
     
-    function processLastManStanding(uint256 gas) public onlyOwner returns(uint256, uint256) {
+    function processLastManStanding(uint256 gas) external onlyOwner returns(uint256, uint256) {
         
         uint256 numberOfTokenHolders = tokenHoldersMap.keys.length;
         
@@ -1944,6 +1964,7 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     		    uint256 startingBalance;
     		    uint256 sendAmount;
     		    startingBalance = IERC20(ADA).balanceOf(address(_lastManStandingAddress));
+    		    balanceForUse = 
     		    sendAmount = startingBalance.div(numberEligible);
     		    IERC20(ADA).transferFrom(_lastManStandingAddress, account, sendAmount);
     		}
@@ -1963,5 +1984,5 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     	
     	return (iterations, lastProcessedIndex);
     }
-    
+
 }
