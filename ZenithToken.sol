@@ -777,7 +777,7 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     		
     		if(account == notValidForLMS) {
     		    if(eligibleForLMS[account] == true) {
-    		        eligibleForLMS[account] == false;
+    		        eligibleForLMS[account] = false;
     		        numberEligible.sub(1);
     		    }
     		} else 
