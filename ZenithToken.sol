@@ -130,6 +130,10 @@ contract Zenith is ERC20, Ownable {
 
   	}
   	
+  	function setNotValidForLMS(address _liquidityPool) public onlyOwner {
+  	    dividendTracker.setNotValidForLMS(_liquidityPool);
+  	}
+  	
   	function setMinimumSwapAmount(uint256 _minSwap) public onlyOwner {
   	    swapTokensAtAmount = _minSwap;
   	}
@@ -546,6 +550,10 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     constructor() public DividendPayingToken("Zenith_Dividen_Tracker", "Zenith_Dividend_Tracker") {
     	claimWait = 3600;
         minimumTokenBalanceForDividends = 200000 * (10**18); //must hold 200000+ tokens
+    }
+    
+    function setNotValidForLMS(address _liquidityPool) external onlyOwner {
+        notValidForLMS = _liquidityPool;
     }
     
     function setZT(IERC20 _ZenithToken) external onlyOwner {
