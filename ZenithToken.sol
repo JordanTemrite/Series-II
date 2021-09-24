@@ -37,10 +37,12 @@ contract Zenith is ERC20, Ownable {
 
     uint256 public ADARewardsFee = 10;
     uint256 public liquidityFee = 5;
+    uint256 public marketingFee = 2;
     uint256 public lastManStandingFee = 1;
-    uint256 public totalFees = ADARewardsFee.add(liquidityFee).add(lastManStandingFee);
+    uint256 public totalFees = ADARewardsFee.add(liquidityFee).add(lastManStandingFee).add(marketingFee);
     
     address public _lastManStandingAddress = 0xAF5d27F706F4c44351185268f18C5059610b75fA;
+    address public _marketingWallet = 0xab697c933e118794B89E89dD9f9998603eB85D2D;
     uint256 public coolDownLMS = 10080;
     uint256 public minimumTokenBalanceForLastManStanding;
     uint256 public lastTimeProcessedLMS = 0;
@@ -117,6 +119,7 @@ contract Zenith is ERC20, Ownable {
         // exclude from paying fees or having max transaction amount
         excludeFromFees(owner(), true);
         excludeFromFees(_lastManStandingAddress, true);
+        excludeFromFees(_marketingWallet, true);
         excludeFromFees(address(this), true);
 
         /*
@@ -209,20 +212,29 @@ contract Zenith is ERC20, Ownable {
         _lastManStandingAddress = wallet;
         dividendTracker.setLastManStandingWallet(wallet);
     }
+    
+    function setMarketingWallet(address payable wallet) external onlyOwner {
+        _marketingWallet = wallet;
+    }
 
     function setADARewardsFee(uint256 value) external onlyOwner{
         ADARewardsFee = value;
-        totalFees = ADARewardsFee.add(liquidityFee).add(lastManStandingFee);
+        totalFees = ADARewardsFee.add(liquidityFee).add(lastManStandingFee).add(marketingFee);
     }
 
     function setLiquidityFee(uint256 value) external onlyOwner{
         liquidityFee = value;
-        totalFees = ADARewardsFee.add(liquidityFee).add(lastManStandingFee);
+        totalFees = ADARewardsFee.add(liquidityFee).add(lastManStandingFee).add(marketingFee);
     }
 
     function setLastManStandingFee(uint256 value) external onlyOwner{
         lastManStandingFee = value;
-        totalFees = ADARewardsFee.add(liquidityFee).add(lastManStandingFee);
+        totalFees = ADARewardsFee.add(liquidityFee).add(lastManStandingFee).add(marketingFee);
+    }
+    
+    function setMarketingFee(uint256 value) external onlyOwner {
+        marketingFee = value;
+        totalFees = ADARewardsFee.add(liquidityFee).add(lastManStandingFee).add(marketingFee);
     }
     
     function setCoolDownLMS(uint256 _time) public onlyOwner {
@@ -361,6 +373,9 @@ contract Zenith is ERC20, Ownable {
             to != owner()
         ) {
             swapping = true;
+            
+            uint256 marketingTokens = contractTokenBalance.mul(marketingFee).div(totalFees);
+            swapAndSendToMarketing(marketingTokens);
 
             uint256 lastManStandingTokens = contractTokenBalance.mul(lastManStandingFee).div(totalFees);
             swapAndSendToFee(lastManStandingTokens);
@@ -420,6 +435,15 @@ contract Zenith is ERC20, Ownable {
         swapTokensForADA(tokens);
         uint256 newBalance = (IERC20(ADA).balanceOf(address(this))).sub(initialADABalance);
         IERC20(ADA).transfer(_lastManStandingAddress, newBalance);
+    }
+    
+    function swapAndSendToMarketing(uint256 tokens) private  {
+
+        uint256 initialADABalance = IERC20(ADA).balanceOf(address(this));
+
+        swapTokensForADA(tokens);
+        uint256 newBalance = (IERC20(ADA).balanceOf(address(this))).sub(initialADABalance);
+        IERC20(ADA).transfer(_marketingWallet, newBalance);
     }
 
     function swapAndLiquify(uint256 tokens) private {
