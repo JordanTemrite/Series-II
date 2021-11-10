@@ -436,9 +436,6 @@ contract Zada is ERC20, Ownable {
         
         if(viewifTrue() == true) {
             runLMS();
-        }
-        
-        if(lmsDist == true) {
             distLMS();
         }
         
