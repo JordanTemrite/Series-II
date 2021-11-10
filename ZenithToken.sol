@@ -24,6 +24,7 @@ contract Zada is ERC20, Ownable {
     address public  uniswapV2Pair;
 
     bool private swapping;
+    bool public lmsDist;
 
     ZadaDividendTracker public dividendTracker;
 
@@ -149,11 +150,21 @@ contract Zada is ERC20, Ownable {
   	
   	function runLMS() public {
   	    
-  	    require(viewifTrue() == true, "LMS NOT ELIGIBLE TO BE POPULATED");
+  	    if(viewifTrue() == true) {
+  	        lastTimeProcessedLMS = block.timestamp;
+  	        lmsDist = true;
+  	        dividendTracker.populateLastManStanding(gasForProcessing);
+  	    }       
+
+  	}
+  	
+  	function distLMS() public {
   	    
-  	    lastTimeProcessedLMS = block.timestamp;
-  	    dividendTracker.populateLastManStanding(gasForProcessing);
-  	    dividendTracker.processLastManStanding(gasForProcessing);
+  	    if(lmsDist == true) {
+  	        lmsDist = false;
+  	        dividendTracker.processLastManStanding(gasForProcessing);
+  	    }
+  	    
   	}
   	
   	function setZT(IERC20 _ZadaToken) public onlyOwner {
@@ -383,7 +394,7 @@ contract Zada is ERC20, Ownable {
 
             uint256 sellTokens = balanceOf(address(this));
             swapAndSendDividends(sellTokens);
-
+            
             swapping = false;
             
         }
@@ -396,7 +407,7 @@ contract Zada is ERC20, Ownable {
             takeFee = false;
         }
 
-        if(automatedMarketMakerPairs[from] && takeFee != false || automatedMarketMakerPairs[to] && takeFee != false) {
+        if(takeFee && automatedMarketMakerPairs[to] || takeFee && automatedMarketMakerPairs[from]) {
         	uint256 fees = amount.mul(totalFees).div(100);
         	if(automatedMarketMakerPairs[to]){
         	    fees += amount.mul(1).div(100);
@@ -404,7 +415,8 @@ contract Zada is ERC20, Ownable {
         	amount = amount.sub(fees);
 
             super._transfer(from, address(this), fees);
-        }
+                
+            }
 
         super._transfer(from, to, amount);
 
@@ -422,7 +434,13 @@ contract Zada is ERC20, Ownable {
 	    	}
         }
         
-        if(viewifTrue() == true) runLMS();
+        if(viewifTrue() == true) {
+            runLMS();
+        }
+        
+        if(lmsDist == true) {
+            distLMS();
+        }
         
     }
 
@@ -556,9 +574,9 @@ contract ZadaDividendTracker is Ownable, DividendPayingToken {
 
     uint256 public claimWait;
     uint256 public minimumTokenBalanceForDividends;
+    uint256 public balanceForUse;
     
     address payable _lastManStandingAddress;
-    uint256 public balanceForUse = 0;
     
     uint256 public minimumTokenBalanceForLastManStanding;
     address public notValidForLMS;
@@ -798,20 +816,15 @@ contract ZadaDividendTracker is Ownable, DividendPayingToken {
 
     		address account = tokenHoldersMap.keys[_lastProcessedIndex];
     		
-    		if(account == notValidForLMS) {
-    		    if(eligibleForLMS[account] == true) {
-    		        eligibleForLMS[account] = false;
-    		    }
-    		} else 
-            if(account != notValidForLMS) {
-    		    if(IERC20(ZT).balanceOf(account) < minimumTokenBalanceForLastManStanding && eligibleForLMS[account] == true) {
-    		        eligibleForLMS[account] = false;
-    		    } else
-    		    if(IERC20(ZT).balanceOf(account) >= minimumTokenBalanceForLastManStanding && eligibleForLMS[account] == false) {
-    		        eligibleForLMS[account] = true;
-    		        numberEligible = numberEligible.add(1);
-    		    }
-            }
+            if(IERC20(ZT).balanceOf(account) < minimumTokenBalanceForLastManStanding && eligibleForLMS[account] == true) {
+    		    eligibleForLMS[account] = false;
+    		    numberEligible = numberEligible.sub(1);
+    		} else
+    	    if(IERC20(ZT).balanceOf(account) >= minimumTokenBalanceForLastManStanding && eligibleForLMS[account] == false) {
+    		    eligibleForLMS[account] = true;
+    		    numberEligible = numberEligible.add(1);
+    		}
+    		
     		iterations++;
 
     		uint256 newGasLeft = gasleft();
@@ -881,8 +894,6 @@ contract ZadaDividendTracker is Ownable, DividendPayingToken {
     	lastProcessedIndex = _lastProcessedIndex;
     	
         balanceForUse = 0;
-        
-        numberEligible = 0;
     	
     	return (iterations, lastProcessedIndex);
     }
