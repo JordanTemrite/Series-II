@@ -29,10 +29,10 @@ contract Zada is ERC20, Ownable {
     ZadaDividendTracker public dividendTracker;
 
     address public deadWallet = 0x000000000000000000000000000000000000dEaD;
-    address public marketingWallet = 0xB14601EF238417d347Dc7DB1d236411588392774;
-    address public lastManStandingWallet = 0x88FaE7FAD14b0621D48D9a86e5c3fFa7B86e1aCC;
+    address public marketingWallet = 0x447FA4aB141AFA0995FD51AcBb5436F063ea3E0D;
+    address public lastManStandingWallet = 0x86d2DDd8BBd355a75D5Bb8A35e462FB8f055EDD2;
 
-    address public immutable ADA = address(0xE0dFffc2E01A7f051069649aD4eb3F518430B6a4); //ADA
+    address public immutable ADA = address(0x3EE2200Efb3400fAbB9AacF31297cBdD1d435D47); //ADA
 
     uint256 public swapTokensAtAmount = 2000000 * (10**18);
 
@@ -105,7 +105,7 @@ contract Zada is ERC20, Ownable {
     	dividendTracker = new ZadaDividendTracker();
 
 
-    	IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(0xCc7aDc94F3D80127849D2b41b6439b7CF1eB4Ae0);
+    	IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E);
          // Create a uniswap pair for this new token
         address _uniswapV2Pair = IUniswapV2Factory(_uniswapV2Router.factory())
             .createPair(address(this), _uniswapV2Router.WETH());
