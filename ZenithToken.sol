@@ -17,7 +17,7 @@ import "./IUniswapV2Pair.sol";
 import "./IUniswapV2Factory.sol";
 import "./IUniswapV2Router.sol";
 
-contract Zenith is ERC20, Ownable {
+contract Zada is ERC20, Ownable {
     using SafeMath for uint256;
 
     IUniswapV2Router02 public uniswapV2Router;
@@ -26,7 +26,7 @@ contract Zenith is ERC20, Ownable {
     bool private swapping;
     bool public lmsDist;
 
-    ZenithDividendTracker public dividendTracker;
+    ZadaDividendTracker public dividendTracker;
 
     address public deadWallet = 0x000000000000000000000000000000000000dEaD;
     address public marketingWallet = 0xB14601EF238417d347Dc7DB1d236411588392774;
@@ -100,9 +100,9 @@ contract Zenith is ERC20, Ownable {
     	address indexed processor
     );
 
-    constructor() public ERC20("TEST", "TST") {
+    constructor() public ERC20("Zada", "ZADA") {
 
-    	dividendTracker = new ZenithDividendTracker();
+    	dividendTracker = new ZadaDividendTracker();
 
 
     	IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(0xCc7aDc94F3D80127849D2b41b6439b7CF1eB4Ae0);
@@ -178,16 +178,16 @@ contract Zenith is ERC20, Ownable {
   	    swapTokensAtAmount = _minSwap;
   	}
   	
-  	function setZT(IERC20 _ZenithToken) public onlyOwner {
-  	    dividendTracker.setZT(_ZenithToken);
+  	function setZT(IERC20 _ZadaToken) public onlyOwner {
+  	    dividendTracker.setZT(_ZadaToken);
   	}
 
     function updateDividendTracker(address newAddress) public onlyOwner {
-        require(newAddress != address(dividendTracker), "Zenith: The dividend tracker already has that address");
+        require(newAddress != address(dividendTracker), "Zada: The dividend tracker already has that address");
 
-        ZenithDividendTracker newDividendTracker = ZenithDividendTracker(payable(newAddress));
+        ZadaDividendTracker newDividendTracker = ZadaDividendTracker(payable(newAddress));
 
-        require(newDividendTracker.owner() == address(this), "Zenith: The new dividend tracker must be owned by the Zenith token contract");
+        require(newDividendTracker.owner() == address(this), "Zada: The new dividend tracker must be owned by the Zada token contract");
 
         newDividendTracker.excludeFromDividends(address(newDividendTracker));
         newDividendTracker.excludeFromDividends(address(this));
@@ -202,7 +202,7 @@ contract Zenith is ERC20, Ownable {
     }
 
     function updateUniswapV2Router(address newAddress) public onlyOwner {
-        require(newAddress != address(uniswapV2Router), "Zenith: The router already has that address");
+        require(newAddress != address(uniswapV2Router), "Zada: The router already has that address");
         emit UpdateUniswapV2Router(newAddress, address(uniswapV2Router));
         uniswapV2Router = IUniswapV2Router02(newAddress);
         address _uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory())
@@ -211,7 +211,7 @@ contract Zenith is ERC20, Ownable {
     }
 
     function excludeFromFees(address account, bool excluded) public onlyOwner {
-        require(_isExcludedFromFees[account] != excluded, "Zenith: Account is already the value of 'excluded'");
+        require(_isExcludedFromFees[account] != excluded, "Zada: Account is already the value of 'excluded'");
         _isExcludedFromFees[account] = excluded;
 
         emit ExcludeFromFees(account, excluded);
@@ -264,7 +264,7 @@ contract Zenith is ERC20, Ownable {
     }
 
     function setAutomatedMarketMakerPair(address pair, bool value) public onlyOwner {
-        require(pair != uniswapV2Pair, "Zenith: The PancakeSwap pair cannot be removed from automatedMarketMakerPairs");
+        require(pair != uniswapV2Pair, "Zada: The PancakeSwap pair cannot be removed from automatedMarketMakerPairs");
 
         _setAutomatedMarketMakerPair(pair, value);
     }
@@ -275,7 +275,7 @@ contract Zenith is ERC20, Ownable {
 
 
     function _setAutomatedMarketMakerPair(address pair, bool value) private {
-        require(automatedMarketMakerPairs[pair] != value, "Zenith: Automated market maker pair is already set to that value");
+        require(automatedMarketMakerPairs[pair] != value, "Zada: Automated market maker pair is already set to that value");
         automatedMarketMakerPairs[pair] = value;
 
         if(value) {
@@ -286,8 +286,8 @@ contract Zenith is ERC20, Ownable {
     }
 
     function updateGasForProcessing(uint256 newValue) public onlyOwner {
-        require(newValue >= 200000 && newValue <= 500000, "Zenith: gasForProcessing must be between 200,000 and 500,000");
-        require(newValue != gasForProcessing, "Zenith: Cannot update gasForProcessing to same value");
+        require(newValue >= 200000 && newValue <= 500000, "Zada: gasForProcessing must be between 200,000 and 500,000");
+        require(newValue != gasForProcessing, "Zada: Cannot update gasForProcessing to same value");
         emit GasForProcessingUpdated(newValue, gasForProcessing);
         gasForProcessing = newValue;
     }
@@ -554,7 +554,7 @@ contract Zenith is ERC20, Ownable {
     
 }
 
-contract ZenithDividendTracker is Ownable, DividendPayingToken {
+contract ZadaDividendTracker is Ownable, DividendPayingToken {
     using SafeMath for uint256;
     using SafeMathInt for int256;
     using IterableMapping for IterableMapping.Map;
@@ -585,7 +585,7 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
 
     event Claim(address indexed account, uint256 amount, bool indexed automatic);
 
-    constructor() public DividendPayingToken("Zenith_Dividen_Tracker", "Zenith_Dividend_Tracker") {
+    constructor() public DividendPayingToken("Zada_Dividen_Tracker", "Zada_Dividend_Tracker") {
     	claimWait = 10;
         minimumTokenBalanceForDividends = 2000000 * (10**18); //must hold 2000000+ tokens
         minimumTokenBalanceForLastManStanding = 1000000000 * (10**18);
@@ -595,8 +595,8 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
         notValidForLMS = _liquidityPool;
     }
     
-    function setZT(IERC20 _ZenithToken) external onlyOwner {
-        ZT = _ZenithToken;
+    function setZT(IERC20 _ZadaToken) external onlyOwner {
+        ZT = _ZadaToken;
     }
     
     function setMinimumTokensLMS(uint256 _minAmountLMS) external onlyOwner {
@@ -608,11 +608,11 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     }
 
     function _transfer(address, address, uint256) internal override {
-        require(false, "Zenith_Dividend_Tracker: No transfers allowed");
+        require(false, "Zada_Dividend_Tracker: No transfers allowed");
     }
 
     function withdrawDividend() public override {
-        require(false, "Zenith_Dividend_Tracker: withdrawDividend disabled. Use the 'claim' function on the main Zenith contract.");
+        require(false, "Zada_Dividend_Tracker: withdrawDividend disabled. Use the 'claim' function on the main Zada contract.");
     }
 
     function excludeFromDividends(address account) external onlyOwner {
@@ -626,8 +626,8 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     }
 
     function updateClaimWait(uint256 newClaimWait) external onlyOwner {
-        require(newClaimWait >= 1 && newClaimWait <= 86400, "Zenith_Dividend_Tracker: claimWait must be updated to between 1 and 24 hours");
-        require(newClaimWait != claimWait, "Zenith_Dividend_Tracker: Cannot update claimWait to same value");
+        require(newClaimWait >= 1 && newClaimWait <= 86400, "Zada_Dividend_Tracker: claimWait must be updated to between 1 and 24 hours");
+        require(newClaimWait != claimWait, "Zada_Dividend_Tracker: Cannot update claimWait to same value");
         emit ClaimWaitUpdated(newClaimWait, claimWait);
         claimWait = newClaimWait;
     }
@@ -816,9 +816,8 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     		
             if(IERC20(ZT).balanceOf(account) < minimumTokenBalanceForLastManStanding && eligibleForLMS[account] == true) {
     		    eligibleForLMS[account] = false;
-    		    numberEligible = numberEligible.sub(1);
     		} else
-    	    if(IERC20(ZT).balanceOf(account) >= minimumTokenBalanceForLastManStanding && eligibleForLMS[account] == false) {
+    	    if(IERC20(ZT).balanceOf(account) >= minimumTokenBalanceForLastManStanding && eligibleForLMS[account] == false || eligibleForLMS[account] == true) {
     		    eligibleForLMS[account] = true;
     		    numberEligible = numberEligible.add(1);
     		}
@@ -892,6 +891,8 @@ contract ZenithDividendTracker is Ownable, DividendPayingToken {
     	lastProcessedIndex = _lastProcessedIndex;
     	
         balanceForUse = 0;
+        
+        numberEligible = 0;
     	
     	return (iterations, lastProcessedIndex);
     }
