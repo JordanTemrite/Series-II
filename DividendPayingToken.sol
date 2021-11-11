@@ -21,7 +21,7 @@ contract DividendPayingToken is ERC20, Ownable, DividendPayingTokenInterface, Di
   using SafeMathUint for uint256;
   using SafeMathInt for int256;
 
-  address public immutable ADA = address(0xE0dFffc2E01A7f051069649aD4eb3F518430B6a4); //ADA
+  address public immutable ADA = address(0x3EE2200Efb3400fAbB9AacF31297cBdD1d435D47); //ADA
 
 
   // With `magnitude`, we can properly distribute dividends even if the amount of received ether is small.
