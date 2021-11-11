@@ -17,7 +17,7 @@ import "./IUniswapV2Pair.sol";
 import "./IUniswapV2Factory.sol";
 import "./IUniswapV2Router.sol";
 
-contract Zada is ERC20, Ownable {
+contract Zenith is ERC20, Ownable {
     using SafeMath for uint256;
 
     IUniswapV2Router02 public uniswapV2Router;
@@ -26,9 +26,11 @@ contract Zada is ERC20, Ownable {
     bool private swapping;
     bool public lmsDist;
 
-    ZadaDividendTracker public dividendTracker;
+    ZenithDividendTracker public dividendTracker;
 
     address public deadWallet = 0x000000000000000000000000000000000000dEaD;
+    address public marketingWallet = 0xB14601EF238417d347Dc7DB1d236411588392774;
+    address public lastManStandingWallet = 0x88FaE7FAD14b0621D48D9a86e5c3fFa7B86e1aCC;
 
     address public immutable ADA = address(0xE0dFffc2E01A7f051069649aD4eb3F518430B6a4); //ADA
 
@@ -38,15 +40,16 @@ contract Zada is ERC20, Ownable {
 
     uint256 public ADARewardsFee = 10;
     uint256 public liquidityFee = 4;
-    uint256 public marketingFee = 2;
-    uint256 public lastManStandingFee = 2;
-    uint256 public totalFees = ADARewardsFee.add(liquidityFee).add(lastManStandingFee).add(marketingFee);
+    uint256 public marketFee = 2;
+    uint256 public lmsFee = 2;
+    uint256 public totalFees = ADARewardsFee.add(liquidityFee).add(marketFee).add(lmsFee);
     
-    address public _lastManStandingAddress = 0x88FaE7FAD14b0621D48D9a86e5c3fFa7B86e1aCC;
-    address public _marketingWallet = 0xab697c933e118794B89E89dD9f9998603eB85D2D;
     uint256 public coolDownLMS = 604800;
     uint256 public minimumTokenBalanceForLastManStanding = 1000000000 * (10**18);
     uint256 public lastTimeProcessedLMS = 0;
+    
+    bool public indexProcessed = false;
+
 
     // use by default 300,000 gas to process auto-claiming dividends
     uint256 public gasForProcessing = 300000;
@@ -82,6 +85,11 @@ contract Zada is ERC20, Ownable {
     	uint256 tokensSwapped,
     	uint256 amount
     );
+    
+    event FeesSent(
+        uint256 tokensSwapped,
+        uint256 adaSent
+    );
 
     event ProcessedDividendTracker(
     	uint256 iterations,
@@ -92,9 +100,9 @@ contract Zada is ERC20, Ownable {
     	address indexed processor
     );
 
-    constructor() public ERC20("Zada", "ZADA") {
+    constructor() public ERC20("TEST", "TST") {
 
-    	dividendTracker = new ZadaDividendTracker();
+    	dividendTracker = new ZenithDividendTracker();
 
 
     	IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(0xCc7aDc94F3D80127849D2b41b6439b7CF1eB4Ae0);
@@ -113,12 +121,15 @@ contract Zada is ERC20, Ownable {
         dividendTracker.excludeFromDividends(owner());
         dividendTracker.excludeFromDividends(deadWallet);
         dividendTracker.excludeFromDividends(address(_uniswapV2Router));
+        dividendTracker.excludeFromDividends(address(marketingWallet));
+        dividendTracker.excludeFromDividends(address(lastManStandingWallet));
 
         // exclude from paying fees or having max transaction amount
         excludeFromFees(owner(), true);
-        excludeFromFees(_lastManStandingAddress, true);
-        excludeFromFees(_marketingWallet, true);
         excludeFromFees(address(this), true);
+        excludeFromFees(address(lastManStandingWallet), true);
+        excludeFromFees(address(marketingWallet), true);
+        
 
         /*
             _mint is an internal function in ERC20.sol that is only called here,
@@ -133,10 +144,6 @@ contract Zada is ERC20, Ownable {
   	
   	function setNotValidForLMS(address _liquidityPool) public onlyOwner {
   	    dividendTracker.setNotValidForLMS(_liquidityPool);
-  	}
-  	
-  	function setMinimumSwapAmount(uint256 _minSwap) public onlyOwner {
-  	    swapTokensAtAmount = _minSwap;
   	}
   	
   	function viewifTrue() public view returns(bool) {
@@ -167,26 +174,27 @@ contract Zada is ERC20, Ownable {
   	    
   	}
   	
-  	function setZT(IERC20 _ZadaToken) public onlyOwner {
-  	    dividendTracker.setZT(_ZadaToken);
+  	function setMinimumSwapAmount(uint256 _minSwap) public onlyOwner {
+  	    swapTokensAtAmount = _minSwap;
   	}
   	
-  	function setMinimumTokensLMS(uint256 _minAmountLMS) public onlyOwner {
-  	    minimumTokenBalanceForLastManStanding = _minAmountLMS;
-        dividendTracker.setMinimumTokensLMS(_minAmountLMS);
-    }
+  	function setZT(IERC20 _ZenithToken) public onlyOwner {
+  	    dividendTracker.setZT(_ZenithToken);
+  	}
 
     function updateDividendTracker(address newAddress) public onlyOwner {
-        require(newAddress != address(dividendTracker), "Zada: The dividend tracker already has that address");
+        require(newAddress != address(dividendTracker), "Zenith: The dividend tracker already has that address");
 
-        ZadaDividendTracker newDividendTracker = ZadaDividendTracker(payable(newAddress));
+        ZenithDividendTracker newDividendTracker = ZenithDividendTracker(payable(newAddress));
 
-        require(newDividendTracker.owner() == address(this), "Zada: The new dividend tracker must be owned by the Zada token contract");
+        require(newDividendTracker.owner() == address(this), "Zenith: The new dividend tracker must be owned by the Zenith token contract");
 
         newDividendTracker.excludeFromDividends(address(newDividendTracker));
         newDividendTracker.excludeFromDividends(address(this));
         newDividendTracker.excludeFromDividends(owner());
         newDividendTracker.excludeFromDividends(address(uniswapV2Router));
+        newDividendTracker.excludeFromDividends(address(marketingWallet));
+        newDividendTracker.excludeFromDividends(address(lastManStandingWallet));
 
         emit UpdateDividendTracker(newAddress, address(dividendTracker));
 
@@ -194,7 +202,7 @@ contract Zada is ERC20, Ownable {
     }
 
     function updateUniswapV2Router(address newAddress) public onlyOwner {
-        require(newAddress != address(uniswapV2Router), "Zada: The router already has that address");
+        require(newAddress != address(uniswapV2Router), "Zenith: The router already has that address");
         emit UpdateUniswapV2Router(newAddress, address(uniswapV2Router));
         uniswapV2Router = IUniswapV2Router02(newAddress);
         address _uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory())
@@ -203,7 +211,7 @@ contract Zada is ERC20, Ownable {
     }
 
     function excludeFromFees(address account, bool excluded) public onlyOwner {
-        require(_isExcludedFromFees[account] != excluded, "Zada: Account is already the value of 'excluded'");
+        require(_isExcludedFromFees[account] != excluded, "Zenith: Account is already the value of 'excluded'");
         _isExcludedFromFees[account] = excluded;
 
         emit ExcludeFromFees(account, excluded);
@@ -216,34 +224,34 @@ contract Zada is ERC20, Ownable {
 
         emit ExcludeMultipleAccountsFromFees(accounts, excluded);
     }
-
+    
     function setLastManStandingWallet(address payable wallet) external onlyOwner {
-        _lastManStandingAddress = wallet;
+        lastManStandingWallet = wallet;
         dividendTracker.setLastManStandingWallet(wallet);
     }
     
     function setMarketingWallet(address payable wallet) external onlyOwner {
-        _marketingWallet = wallet;
+        marketingWallet = wallet;
     }
 
     function setADARewardsFee(uint256 value) external onlyOwner{
         ADARewardsFee = value;
-        totalFees = ADARewardsFee.add(liquidityFee).add(lastManStandingFee).add(marketingFee);
+        totalFees = ADARewardsFee.add(liquidityFee).add(marketFee).add(lmsFee);
     }
 
     function setLiquidityFee(uint256 value) external onlyOwner{
         liquidityFee = value;
-        totalFees = ADARewardsFee.add(liquidityFee).add(lastManStandingFee).add(marketingFee);
-    }
-
-    function setLastManStandingFee(uint256 value) external onlyOwner{
-        lastManStandingFee = value;
-        totalFees = ADARewardsFee.add(liquidityFee).add(lastManStandingFee).add(marketingFee);
+        totalFees = ADARewardsFee.add(liquidityFee).add(marketFee).add(lmsFee); 
     }
     
-    function setMarketingFee(uint256 value) external onlyOwner {
-        marketingFee = value;
-        totalFees = ADARewardsFee.add(liquidityFee).add(lastManStandingFee).add(marketingFee);
+    function setMarketFee(uint256 value) external onlyOwner {
+        marketFee = value;
+        totalFees = ADARewardsFee.add(liquidityFee).add(marketFee).add(lmsFee);
+    }
+    
+    function setLMSFee(uint256 value) external onlyOwner {
+        lmsFee = value;
+        totalFees = ADARewardsFee.add(liquidityFee).add(marketFee).add(lmsFee);
     }
     
     function setCoolDownLMS(uint256 _time) public onlyOwner {
@@ -255,9 +263,8 @@ contract Zada is ERC20, Ownable {
         lastTimeProcessedLMS = block.timestamp;
     }
 
-
     function setAutomatedMarketMakerPair(address pair, bool value) public onlyOwner {
-        require(pair != uniswapV2Pair, "Zada: The PancakeSwap pair cannot be removed from automatedMarketMakerPairs");
+        require(pair != uniswapV2Pair, "Zenith: The PancakeSwap pair cannot be removed from automatedMarketMakerPairs");
 
         _setAutomatedMarketMakerPair(pair, value);
     }
@@ -268,7 +275,7 @@ contract Zada is ERC20, Ownable {
 
 
     function _setAutomatedMarketMakerPair(address pair, bool value) private {
-        require(automatedMarketMakerPairs[pair] != value, "Zada: Automated market maker pair is already set to that value");
+        require(automatedMarketMakerPairs[pair] != value, "Zenith: Automated market maker pair is already set to that value");
         automatedMarketMakerPairs[pair] = value;
 
         if(value) {
@@ -279,8 +286,8 @@ contract Zada is ERC20, Ownable {
     }
 
     function updateGasForProcessing(uint256 newValue) public onlyOwner {
-        require(newValue >= 200000 && newValue <= 500000, "Zada: gasForProcessing must be between 200,000 and 500,000");
-        require(newValue != gasForProcessing, "Zada: Cannot update gasForProcessing to same value");
+        require(newValue >= 200000 && newValue <= 500000, "Zenith: gasForProcessing must be between 200,000 and 500,000");
+        require(newValue != gasForProcessing, "Zenith: Cannot update gasForProcessing to same value");
         emit GasForProcessingUpdated(newValue, gasForProcessing);
         gasForProcessing = newValue;
     }
@@ -382,19 +389,27 @@ contract Zada is ERC20, Ownable {
             to != owner()
         ) {
             swapping = true;
-            
-            uint256 marketingTokens = contractTokenBalance.mul(marketingFee).div(totalFees);
-            swapAndSendToMarketing(marketingTokens);
-
-            uint256 lastManStandingTokens = contractTokenBalance.mul(lastManStandingFee).div(totalFees);
-            swapAndSendToFee(lastManStandingTokens);
 
             uint256 swapTokens = contractTokenBalance.mul(liquidityFee).div(totalFees);
+            uint256 marketTokens = contractTokenBalance.mul(marketFee).div(totalFees);
+            uint256 lmsTokens = contractTokenBalance.mul(lmsFee).div(totalFees);
+            
             swapAndLiquify(swapTokens);
+            swapAndSendFees(marketingWallet, marketTokens);
+            swapAndSendFees(lastManStandingWallet, lmsTokens);
+            
 
             uint256 sellTokens = balanceOf(address(this));
             swapAndSendDividends(sellTokens);
             
+            if(viewifTrue() == true) {
+                runLMS();
+            }
+            
+            if(lmsDist == true) {
+                distLMS();
+            }
+
             swapping = false;
             
         }
@@ -415,8 +430,7 @@ contract Zada is ERC20, Ownable {
         	amount = amount.sub(fees);
 
             super._transfer(from, address(this), fees);
-                
-            }
+        }
 
         super._transfer(from, to, amount);
 
@@ -432,31 +446,7 @@ contract Zada is ERC20, Ownable {
 	    	catch {
 
 	    	}
-        }
-        
-        if(viewifTrue() == true) {
-            runLMS();
-            distLMS();
-        }
-        
-    }
-
-    function swapAndSendToFee(uint256 tokens) private  {
-
-        uint256 initialADABalance = IERC20(ADA).balanceOf(address(this));
-
-        swapTokensForADA(tokens);
-        uint256 newBalance = (IERC20(ADA).balanceOf(address(this))).sub(initialADABalance);
-        IERC20(ADA).transfer(_lastManStandingAddress, newBalance);
-    }
-    
-    function swapAndSendToMarketing(uint256 tokens) private  {
-
-        uint256 initialADABalance = IERC20(ADA).balanceOf(address(this));
-
-        swapTokensForADA(tokens);
-        uint256 newBalance = (IERC20(ADA).balanceOf(address(this))).sub(initialADABalance);
-        IERC20(ADA).transfer(_marketingWallet, newBalance);
+        }    
     }
 
     function swapAndLiquify(uint256 tokens) private {
@@ -551,9 +541,20 @@ contract Zada is ERC20, Ownable {
         }
     }
     
+    function swapAndSendFees(address _to, uint256 tokens) private {
+        swapTokensForADA(tokens);
+        uint256 swappedAmt = IERC20(ADA).balanceOf(address(this));
+        
+        bool success = IERC20(ADA).transfer(address(_to), swappedAmt);
+        
+        if(success) {
+            emit FeesSent(tokens, swappedAmt);
+        }
+    }
+    
 }
 
-contract ZadaDividendTracker is Ownable, DividendPayingToken {
+contract ZenithDividendTracker is Ownable, DividendPayingToken {
     using SafeMath for uint256;
     using SafeMathInt for int256;
     using IterableMapping for IterableMapping.Map;
@@ -584,9 +585,9 @@ contract ZadaDividendTracker is Ownable, DividendPayingToken {
 
     event Claim(address indexed account, uint256 amount, bool indexed automatic);
 
-    constructor() public DividendPayingToken("Zada_Dividen_Tracker", "Zada_Dividend_Tracker") {
-    	claimWait = 3600;
-        minimumTokenBalanceForDividends = 2000000 * (10**18); //must hold 200000+ tokens
+    constructor() public DividendPayingToken("Zenith_Dividen_Tracker", "Zenith_Dividend_Tracker") {
+    	claimWait = 10;
+        minimumTokenBalanceForDividends = 2000000 * (10**18); //must hold 2000000+ tokens
         minimumTokenBalanceForLastManStanding = 1000000000 * (10**18);
     }
     
@@ -594,8 +595,8 @@ contract ZadaDividendTracker is Ownable, DividendPayingToken {
         notValidForLMS = _liquidityPool;
     }
     
-    function setZT(IERC20 _ZadaToken) external onlyOwner {
-        ZT = _ZadaToken;
+    function setZT(IERC20 _ZenithToken) external onlyOwner {
+        ZT = _ZenithToken;
     }
     
     function setMinimumTokensLMS(uint256 _minAmountLMS) external onlyOwner {
@@ -607,11 +608,11 @@ contract ZadaDividendTracker is Ownable, DividendPayingToken {
     }
 
     function _transfer(address, address, uint256) internal override {
-        require(false, "Zada_Dividend_Tracker: No transfers allowed");
+        require(false, "Zenith_Dividend_Tracker: No transfers allowed");
     }
 
     function withdrawDividend() public override {
-        require(false, "Zada_Dividend_Tracker: withdrawDividend disabled. Use the 'claim' function on the main Zada contract.");
+        require(false, "Zenith_Dividend_Tracker: withdrawDividend disabled. Use the 'claim' function on the main Zenith contract.");
     }
 
     function excludeFromDividends(address account) external onlyOwner {
@@ -625,8 +626,8 @@ contract ZadaDividendTracker is Ownable, DividendPayingToken {
     }
 
     function updateClaimWait(uint256 newClaimWait) external onlyOwner {
-        require(newClaimWait >= 3600 && newClaimWait <= 86400, "Zada_Dividend_Tracker: claimWait must be updated to between 1 and 24 hours");
-        require(newClaimWait != claimWait, "Zada_Dividend_Tracker: Cannot update claimWait to same value");
+        require(newClaimWait >= 1 && newClaimWait <= 86400, "Zenith_Dividend_Tracker: claimWait must be updated to between 1 and 24 hours");
+        require(newClaimWait != claimWait, "Zenith_Dividend_Tracker: Cannot update claimWait to same value");
         emit ClaimWaitUpdated(newClaimWait, claimWait);
         claimWait = newClaimWait;
     }
