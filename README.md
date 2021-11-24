@@ -1,1 +1,1 @@
-# ZenithBSC
+# Zada BSC
