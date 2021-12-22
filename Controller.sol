@@ -168,6 +168,7 @@ contract Controller is Ownable {
     function transferOwner(address _newOwner) public signAuthorized(20){
         require(isSigner(msg.sender) == true, "ZADA: NOT AN APPROVED SIGNER");
         zContract.transferOwnership(_newOwner);
+        clearSigns(20);
     }       
 
     //MULTISIG FUNCTIONS
