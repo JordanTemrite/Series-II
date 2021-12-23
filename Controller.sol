@@ -19,8 +19,12 @@ contract Controller is Ownable {
     Zada public zContract;
 
     address[] public signers = [
-        0xAF5d27F706F4c44351185268f18C5059610b75fA,
-        0x88FaE7FAD14b0621D48D9a86e5c3fFa7B86e1aCC
+        0x97B7e24A17494B46905Ddc13FBC8E9011496E498,
+        0xab697c933e118794B89E89dD9f9998603eB85D2D,
+        0xF860486d668821aDb8FE3c78de20Ca5C90aAe3ab,
+        0x33E3761AEADE9540A09A2E2B86D981A26205ece1,
+        0xF06BF61831C996CCFFAF081b8A3cF6eFDBd86275,
+        0xC3A2d356F61CF603DBC75be7229FcDBfaB83eE0b
     ];
 
     mapping(uint256 =>mapping(address => bool)) signatures;
@@ -168,7 +172,6 @@ contract Controller is Ownable {
     function transferOwner(address _newOwner) public signAuthorized(20){
         require(isSigner(msg.sender) == true, "ZADA: NOT AN APPROVED SIGNER");
         zContract.transferOwnership(_newOwner);
-        clearSigns(20);
     }       
 
     //MULTISIG FUNCTIONS
